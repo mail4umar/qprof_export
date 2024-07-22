@@ -1,24 +1,41 @@
 #!/bin/bash
-# MODIFIED BY UMAR - 7/16/2024
-# This is bash-like pseudo code designed to express the thoughts
+# MODIFIED BY UMAR - 7/22/2024
+# This script profiles queries and optionally creates a schema if not provided
+
+##############################
+# USER CONFIGURATION SECTION #
+##############################
+
+# Database credentials for query execution
+QUERY_USER="ughumman"
+QUERY_USER_PASSWORD='""'
+
+# Database credentials for administrative operations
+ADMIN_USER="ughumman"
+ADMIN_PASSWORD=""
+
+PROJECT_NAME="test"
+CUSTOMER_NAME="XYZ"
+##############################
+# END USER CONFIGURATION      #
+##############################
+
 
 set -euo pipefail
 
 SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
 SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
 
-if [ "$#" -lt  "4" ]; then
-    echo "Usage: $0 target_schema customer_name project_name config_file"
+if [ "$#" -lt  "1" ]; then
+    echo "Usage: $0 config_file [target_schema]"
     exit 1
 fi
 
-TARGET_SCHEMA="$1"
-CUSTOMER_NAME="$2"
-PROJECT_NAME="$3"
-CONFIG_FILE="$4"
+CONFIG_FILE="$1"
+TARGET_SCHEMA="${2:-}"
 
 if [ ! -e "$CONFIG_FILE" ]; then
-    echo "QUery file $CONFIG_FILE does not exist"
+    echo "Configuration file $CONFIG_FILE does not exist"
     exit 1
 fi
 
@@ -29,18 +46,41 @@ if [ ! -e "$SQL_DIR" ]; then
     exit 1
 fi
 
-
-QUERY_USER=ughumman
-QUERY_USER_PASSWORD='""'
-
-ADMIN_USER=ughumman
-ADMIN_PASSWORD=''
-
 VSQL=${VSQL:-vsql}
 
-VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD " # UMAR TEMP CHANGE => VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD "
-VSQL_USER_COMMAND="${VSQL} -U $QUERY_USER -w $QUERY_USER_PASSWORD " # UMAR TEMP CHANGE => "${VSQL} -U $QUERY_USER -w $QUERY_USER_PASSWORD "
+VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD"
+VSQL_USER_COMMAND="${VSQL} -U $QUERY_USER -w $QUERY_USER_PASSWORD"
 
+# Function to generate a random schema name
+generate_random_schema() {
+    local SCHEMA_NAME
+    while true; do
+        SCHEMA_NAME="schema_$(openssl rand -hex 8)"
+        # Check if the schema already exists
+        if $VSQL_ADMIN_COMMAND -t -c "SELECT COUNT(*) FROM v_catalog.schemata WHERE schema_name = '$SCHEMA_NAME';" | grep -q '0'; then
+            echo "$SCHEMA_NAME"
+            return
+        fi
+    done
+}
+
+# Check and handle target schema
+if [ -z "$TARGET_SCHEMA" ]; then
+    # No schema provided, generate a random one
+    TARGET_SCHEMA=$(generate_random_schema)
+    echo "No schema provided. Generated schema name: $TARGET_SCHEMA"
+else
+    # User provided a schema, check if it exists
+    if $VSQL_ADMIN_COMMAND -t -c "SELECT COUNT(*) FROM v_catalog.schemata WHERE schema_namea = '$TARGET_SCHEMA';" | grep -q '0'; then
+        echo "Schema '$TARGET_SCHEMA' does not exist. It will be created."
+    else
+        echo "Error: Schema '$TARGET_SCHEMA' already exists. Please provide a different schema name or omit it to generate a random schema."
+        exit 1
+    fi
+fi
+
+echo "Using schema name: $TARGET_SCHEMA"
+VSQL=${VSQL:-vsql}
 
 RAND_ID=$(($RANDOM % 100))
 RUN_ID="run_$RAND_ID"
@@ -57,9 +97,6 @@ if ! mkdir -p "$SCRATCH_DIR"; then
     echo "Error: Unable to create directory $SCRATCH_DIR. Please check permissions."
     exit 1
 fi
-
-START_TIME=$(date +"%Y-%m-%d %H:%m:%S")
-
 
 echo "+++ Making schema +++"
 
@@ -239,7 +276,7 @@ done
 
 
 
-echo "BUilding up verification tables"
+echo "Building up verification tables"
 
 
 for t in $SOURCE_TABLES $SNAPSHOT_TABLES
@@ -259,3 +296,7 @@ $VSQL_ADMIN_COMMAND -a -c "select transaction_id, statement_id, table_name, sum(
 
 
 echo "Done with script collecting into $TARGET_SCHEMA. Profiled ${PROF_COUNT} queries" 
+
+echo "Next - Run the export script"
+
+./export.sh "$TARGET_SCHEMA"
