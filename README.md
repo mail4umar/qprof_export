@@ -29,6 +29,13 @@ QUERY_USER_PASSWORD='""'
 ADMIN_USER="ughumman"
 ADMIN_PASSWORD=""
 ```
+
+Provide a local directory where the parquet files can be saved temporarily:
+
+```
+LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
+```
+
 Then optionally add project/customer info:
 
 ```
