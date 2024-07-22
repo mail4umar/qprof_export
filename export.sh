@@ -30,6 +30,10 @@ echo "---------------------------------------------------"
 $VSQL -a -c "create table if not exists ${TARGET_SCHEMA}.export_events(table_name varchar (256), operation varchar(128), row_count int);"
 $VSQL -a -c "truncate table ${TARGET_SCHEMA}.export_events;"
 
+# Initialize an empty metadata JSON file
+METADATA_FILE="${TEMP_BUNDLE}/metadata.json"
+echo "{\"version\": \"2\", \"tables\": [" > $METADATA_FILE
+
 for t in $regular_tables
 do
     echo "++++++++++++++++++++++++++++++++++++++++"
@@ -49,6 +53,9 @@ do
         $VSQL -a -c "insert into ${TARGET_SCHEMA}.export_events VALUES ('$table', 'export', $rows); commit"
         echo "Table $t exported rows $rows"
         cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
+        
+        # Append metadata to JSON file
+        echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
     fi
 done
 
@@ -72,6 +79,9 @@ do
     $VSQL -a -c "insert into ${TARGET_SCHEMA}.export_events VALUES ('$table', 'export', $rows); commit"
     echo "Table $t exported rows $rows"
     cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
+    
+    # Append metadata to JSON file
+    echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
 done
 
 for t in "v_monitor.resource_pool_status"
@@ -92,6 +102,9 @@ do
     $VSQL -a -c "insert into ${TARGET_SCHEMA}.export_events VALUES ('$table', 'export', $rows); commit"
     echo "Table $t exported rows $rows"
     cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
+    
+    # Append metadata to JSON file
+    echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
 done
 
 for t in "${TARGET_SCHEMA}.export_events"
@@ -108,11 +121,18 @@ do
     rows=$(cat $ROWS_FILE)
     echo "Table $t exported rows $rows"
     cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
+    
+    # Append metadata to JSON file
+    echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
 done
+
+# Remove the last comma and close the JSON array
+sed -i '$ s/,$//' $METADATA_FILE
+echo "]}" >> $METADATA_FILE
 
 WORKING_DIR=$PWD
 pushd ${TEMP_BUNDLE}
-tar cvf "${WORKING_DIR}/${TARGET_SCHEMA}.tar" *.parquet
+tar cvf "${WORKING_DIR}/${TARGET_SCHEMA}.tar" *.parquet metadata.json
 popd
 ls -lrth ${TARGET_SCHEMA}.tar
 
@@ -124,10 +144,3 @@ echo "RUN ID  was $RUN_ID"
 echo "Worked with temp dir $LOCAL_TEMP_DIR"
 echo "---------------------------------------------------"
 echo "DONE"
-
-echo "Create the bundle tar file"
-WORKING_DIR=$PWD
-pushd ${LOCAL_TEMP_DIR}/bundle
-tar cvf "${WORKING_DIR}/bundle.tar" *.parquet
-popd
-ls -lrth ${TARGET_SCHEMA}.tar
