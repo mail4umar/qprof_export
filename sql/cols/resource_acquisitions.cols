@@ -1,0 +1,2 @@
+ node_name,transaction_id,statement_id,request_type,pool_id,pool_name,thread_count,open_file_handle_count,memory_inuse_kb,queue_entry_timestamp,acquisition_timestamp,release_timestamp,duration_ms,is_executing
+

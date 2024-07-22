@@ -1,0 +1,1 @@
+time,node_name,session_id,user_id,user_name,transaction_id,statement_id,request_id,event_description,threshold_us,duration_us,val1,val2,val3,phases_duration_us,thread_id

@@ -1,0 +1,2 @@
+ start_time,end_time,session_id,user_id,user_name,transaction_id,statement_id,cpu_cycles_us,network_bytes_received,network_bytes_sent,data_bytes_read,data_bytes_written,data_bytes_loaded,bytes_spilled,input_rows,input_rows_processed,peak_memory_kb,thread_count,duration_ms,resource_pool,output_rows,request_type,label,is_retry,success
+

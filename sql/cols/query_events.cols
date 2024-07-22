@@ -1,0 +1,1 @@
+event_timestamp,node_name,user_id,user_name,session_id,request_id,transaction_id,statement_id,event_category,event_type,event_description,operator_name,path_id,object_id,event_details,event_severity,suggested_action

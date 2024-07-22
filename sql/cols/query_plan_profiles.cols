@@ -1,0 +1,2 @@
+ transaction_id,statement_id,path_id,path_line_index,path_is_started,path_is_completed,is_executing,running_time,memory_allocated_bytes,read_from_disk_bytes,received_bytes,sent_bytes,path_line
+

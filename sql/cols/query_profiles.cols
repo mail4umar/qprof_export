@@ -1,0 +1,2 @@
+ session_id,transaction_id,statement_id,identifier,node_name,query,query_search_path,schema_name,table_name,query_duration_us,query_start_epoch,query_start,query_type,error_code,user_name,processed_row_count,reserved_extra_memory_b,is_executing
+

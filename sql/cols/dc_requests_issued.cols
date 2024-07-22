@@ -1,0 +1,2 @@
+ time,node_name,session_id,user_id,user_name,transaction_id,statement_id,request_id,request_type,label,client_label,search_path,query_start_epoch,request,is_retry,digest
+

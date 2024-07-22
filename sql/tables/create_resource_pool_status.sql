@@ -1,0 +1,226 @@
+
+/* Create a staging table */
+CREATE TABLE IF NOT EXISTS  IMPORT_SCHEMA.qprof_resource_pool_status_stage_key
+(
+    node_name varchar(128),
+    pool_oid int,
+    pool_name varchar(128),
+    is_internal boolean,
+    memory_size_kb int,
+    memory_size_actual_kb int,
+    memory_inuse_kb int,
+    general_memory_borrowed_kb int,
+    queueing_threshold_kb int,
+    max_memory_size_kb int,
+    max_query_memory_size_kb int,
+    running_query_count int,
+    planned_concurrency int,
+    max_concurrency int,
+    is_standalone boolean,
+    /* HACK queue_timeout is a int parquet doesn't like intervals and queue_timeout is an interval
+     * The export set queue_timeout = queue_timeout_in_seconds
+     */
+    queue_timeout int,
+    queue_timeout_in_seconds int,
+    execution_parallelism varchar(128),
+    priority int,
+    runtime_priority varchar(128),
+    runtime_priority_threshold int,
+    runtimecap_in_seconds int,
+    single_initiator varchar(128),
+    query_budget_kb int,
+    cpu_affinity_set varchar(256),
+    cpu_affinity_mask varchar(1024),
+    cpu_affinity_mode varchar(128),
+    transaction_id int,
+    statement_id int,
+    query_name varchar(128)
+);
+
+
+CREATE PROJECTION IF NOT EXISTS IMPORT_SCHEMA.qprof_resource_pool_status_stage_key_super /*+basename(qprof_resource_pool_status_stage_key),createtype(A)*/ 
+(
+ node_name,
+ pool_oid,
+ pool_name,
+ is_internal,
+ memory_size_kb,
+ memory_size_actual_kb,
+ memory_inuse_kb,
+ general_memory_borrowed_kb,
+ queueing_threshold_kb,
+ max_memory_size_kb,
+ max_query_memory_size_kb,
+ running_query_count,
+ planned_concurrency,
+ max_concurrency,
+ is_standalone,
+ queue_timeout,
+ queue_timeout_in_seconds,
+ execution_parallelism,
+ priority,
+ runtime_priority,
+ runtime_priority_threshold,
+ runtimecap_in_seconds,
+ single_initiator,
+ query_budget_kb,
+ cpu_affinity_set,
+ cpu_affinity_mask,
+ cpu_affinity_mode,
+ transaction_id,
+ statement_id,
+ query_name
+)
+AS
+ SELECT qprof_resource_pool_status_stage_key.node_name,
+        qprof_resource_pool_status_stage_key.pool_oid,
+        qprof_resource_pool_status_stage_key.pool_name,
+        qprof_resource_pool_status_stage_key.is_internal,
+        qprof_resource_pool_status_stage_key.memory_size_kb,
+        qprof_resource_pool_status_stage_key.memory_size_actual_kb,
+        qprof_resource_pool_status_stage_key.memory_inuse_kb,
+        qprof_resource_pool_status_stage_key.general_memory_borrowed_kb,
+        qprof_resource_pool_status_stage_key.queueing_threshold_kb,
+        qprof_resource_pool_status_stage_key.max_memory_size_kb,
+        qprof_resource_pool_status_stage_key.max_query_memory_size_kb,
+        qprof_resource_pool_status_stage_key.running_query_count,
+        qprof_resource_pool_status_stage_key.planned_concurrency,
+        qprof_resource_pool_status_stage_key.max_concurrency,
+        qprof_resource_pool_status_stage_key.is_standalone,
+        qprof_resource_pool_status_stage_key.queue_timeout,
+        qprof_resource_pool_status_stage_key.queue_timeout_in_seconds,
+        qprof_resource_pool_status_stage_key.execution_parallelism,
+        qprof_resource_pool_status_stage_key.priority,
+        qprof_resource_pool_status_stage_key.runtime_priority,
+        qprof_resource_pool_status_stage_key.runtime_priority_threshold,
+        qprof_resource_pool_status_stage_key.runtimecap_in_seconds,
+        qprof_resource_pool_status_stage_key.single_initiator,
+        qprof_resource_pool_status_stage_key.query_budget_kb,
+        qprof_resource_pool_status_stage_key.cpu_affinity_set,
+        qprof_resource_pool_status_stage_key.cpu_affinity_mask,
+        qprof_resource_pool_status_stage_key.cpu_affinity_mode,
+        qprof_resource_pool_status_stage_key.transaction_id,
+        qprof_resource_pool_status_stage_key.statement_id,
+        qprof_resource_pool_status_stage_key.query_name
+ FROM IMPORT_SCHEMA.qprof_resource_pool_status_stage_key
+ ORDER BY qprof_resource_pool_status_stage_key.transaction_id,
+          qprof_resource_pool_status_stage_key.statement_id,
+          qprof_resource_pool_status_stage_key.node_name,
+          qprof_resource_pool_status_stage_key.pool_name,
+          qprof_resource_pool_status_stage_key.query_budget_kb
+SEGMENTED BY hash(qprof_resource_pool_status_stage_key.pool_oid, qprof_resource_pool_status_stage_key.is_internal, qprof_resource_pool_status_stage_key.memory_size_kb, qprof_resource_pool_status_stage_key.memory_size_actual_kb, qprof_resource_pool_status_stage_key.memory_inuse_kb, qprof_resource_pool_status_stage_key.general_memory_borrowed_kb, qprof_resource_pool_status_stage_key.queueing_threshold_kb, qprof_resource_pool_status_stage_key.max_memory_size_kb) ALL NODES;
+
+/* Create the real table */
+CREATE TABLE IF NOT EXISTS  IMPORT_SCHEMA.qprof_resource_pool_status_key
+(
+    node_name varchar(128),
+    pool_oid int,
+    pool_name varchar(128),
+    is_internal boolean,
+    memory_size_kb int,
+    memory_size_actual_kb int,
+    memory_inuse_kb int,
+    general_memory_borrowed_kb int,
+    queueing_threshold_kb int,
+    max_memory_size_kb int,
+    max_query_memory_size_kb int,
+    running_query_count int,
+    planned_concurrency int,
+    max_concurrency int,
+    is_standalone boolean,
+    -- queue timeout is really an interval
+    queue_timeout interval,
+    queue_timeout_in_seconds int,
+    execution_parallelism varchar(128),
+    priority int,
+    runtime_priority varchar(128),
+    runtime_priority_threshold int,
+    runtimecap_in_seconds int,
+    single_initiator varchar(128),
+    query_budget_kb int,
+    cpu_affinity_set varchar(256),
+    cpu_affinity_mask varchar(1024),
+    cpu_affinity_mode varchar(128),
+    transaction_id int,
+    statement_id int,
+    query_name varchar(128)
+);
+
+
+CREATE PROJECTION IF NOT EXISTS IMPORT_SCHEMA.qprof_resource_pool_status_key_super /*+basename(qprof_resource_pool_status_key),createtype(A)*/ 
+(
+ node_name,
+ pool_oid,
+ pool_name,
+ is_internal,
+ memory_size_kb,
+ memory_size_actual_kb,
+ memory_inuse_kb,
+ general_memory_borrowed_kb,
+ queueing_threshold_kb,
+ max_memory_size_kb,
+ max_query_memory_size_kb,
+ running_query_count,
+ planned_concurrency,
+ max_concurrency,
+ is_standalone,
+ queue_timeout,
+ queue_timeout_in_seconds,
+ execution_parallelism,
+ priority,
+ runtime_priority,
+ runtime_priority_threshold,
+ runtimecap_in_seconds,
+ single_initiator,
+ query_budget_kb,
+ cpu_affinity_set,
+ cpu_affinity_mask,
+ cpu_affinity_mode,
+ transaction_id,
+ statement_id,
+ query_name
+)
+AS
+ SELECT qprof_resource_pool_status_key.node_name,
+        qprof_resource_pool_status_key.pool_oid,
+        qprof_resource_pool_status_key.pool_name,
+        qprof_resource_pool_status_key.is_internal,
+        qprof_resource_pool_status_key.memory_size_kb,
+        qprof_resource_pool_status_key.memory_size_actual_kb,
+        qprof_resource_pool_status_key.memory_inuse_kb,
+        qprof_resource_pool_status_key.general_memory_borrowed_kb,
+        qprof_resource_pool_status_key.queueing_threshold_kb,
+        qprof_resource_pool_status_key.max_memory_size_kb,
+        qprof_resource_pool_status_key.max_query_memory_size_kb,
+        qprof_resource_pool_status_key.running_query_count,
+        qprof_resource_pool_status_key.planned_concurrency,
+        qprof_resource_pool_status_key.max_concurrency,
+        qprof_resource_pool_status_key.is_standalone,
+        qprof_resource_pool_status_key.queue_timeout,
+        qprof_resource_pool_status_key.queue_timeout_in_seconds,
+        qprof_resource_pool_status_key.execution_parallelism,
+        qprof_resource_pool_status_key.priority,
+        qprof_resource_pool_status_key.runtime_priority,
+        qprof_resource_pool_status_key.runtime_priority_threshold,
+        qprof_resource_pool_status_key.runtimecap_in_seconds,
+        qprof_resource_pool_status_key.single_initiator,
+        qprof_resource_pool_status_key.query_budget_kb,
+        qprof_resource_pool_status_key.cpu_affinity_set,
+        qprof_resource_pool_status_key.cpu_affinity_mask,
+        qprof_resource_pool_status_key.cpu_affinity_mode,
+        qprof_resource_pool_status_key.transaction_id,
+        qprof_resource_pool_status_key.statement_id,
+        qprof_resource_pool_status_key.query_name
+ FROM IMPORT_SCHEMA.qprof_resource_pool_status_key
+ ORDER BY qprof_resource_pool_status_key.transaction_id,
+          qprof_resource_pool_status_key.statement_id,
+          qprof_resource_pool_status_key.node_name,
+          qprof_resource_pool_status_key.pool_name,
+          qprof_resource_pool_status_key.query_budget_kb
+SEGMENTED BY hash(qprof_resource_pool_status_key.pool_oid, qprof_resource_pool_status_key.is_internal, qprof_resource_pool_status_key.memory_size_kb, qprof_resource_pool_status_key.memory_size_actual_kb, qprof_resource_pool_status_key.memory_inuse_kb, qprof_resource_pool_status_key.general_memory_borrowed_kb, qprof_resource_pool_status_key.queueing_threshold_kb, qprof_resource_pool_status_key.max_memory_size_kb) ALL NODES;
+
+
+
+
+
+

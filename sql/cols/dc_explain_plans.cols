@@ -1,0 +1,2 @@
+ time,node_name,session_id,user_id,user_name,transaction_id,statement_id,request_id,path_id,path_line_index,path_line
+

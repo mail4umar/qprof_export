@@ -1,0 +1,2 @@
+ node_name,user_id,user_name,session_id,transaction_id,statement_id,plan_id,operator_name,operator_id,baseplan_id,path_id,localplan_id,activity_id,resource_id,counter_name,counter_tag,counter_value,is_executing
+
