@@ -14,6 +14,10 @@ QUERY_USER_PASSWORD='""'
 ADMIN_USER="ughumman"
 ADMIN_PASSWORD=""
 
+# Local directory for temporarily storing parquet files
+LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
+
+# For tracking
 PROJECT_NAME="test"
 CUSTOMER_NAME="XYZ"
 ##############################
@@ -71,7 +75,7 @@ if [ -z "$TARGET_SCHEMA" ]; then
     echo "No schema provided. Generated schema name: $TARGET_SCHEMA"
 else
     # User provided a schema, check if it exists
-    if $VSQL_ADMIN_COMMAND -t -c "SELECT COUNT(*) FROM v_catalog.schemata WHERE schema_namea = '$TARGET_SCHEMA';" | grep -q '0'; then
+    if $VSQL_ADMIN_COMMAND -t -c "SELECT COUNT(*) FROM v_catalog.schemata WHERE schema_name = '$TARGET_SCHEMA';" | grep -q '0'; then
         echo "Schema '$TARGET_SCHEMA' does not exist. It will be created."
     else
         echo "Error: Schema '$TARGET_SCHEMA' already exists. Please provide a different schema name or omit it to generate a random schema."
@@ -80,7 +84,6 @@ else
 fi
 
 echo "Using schema name: $TARGET_SCHEMA"
-VSQL=${VSQL:-vsql}
 
 RAND_ID=$(($RANDOM % 100))
 RUN_ID="run_$RAND_ID"
@@ -217,7 +220,7 @@ do
     echo "Begin query execution"
 
     PROFILE_NOTICE_FILE=$SCRATCH_DIR/${QUERY_FILE_BASENAME}.prof_msg
-    time $VSQL_USER_COMMAND -o dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
+    time $VSQL_USER_COMMAND -o /dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
     echo "Query execution complete"
     cat $PROFILE_NOTICE_FILE
     QUERY_ID_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}.qid
@@ -299,4 +302,4 @@ echo "Done with script collecting into $TARGET_SCHEMA. Profiled ${PROF_COUNT} qu
 
 echo "Next - Run the export script"
 
-./export.sh "$TARGET_SCHEMA"
+./export.sh "$TARGET_SCHEMA" "$LOCAL_DIRECTORY"
