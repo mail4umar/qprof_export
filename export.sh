@@ -9,13 +9,20 @@ fi
 
 VSQL=${VSQL:-vsql}
 TARGET_SCHEMA="$1"
+LOCAL_DIRECTORY="${2:-}"
 
 RAND_ID=$(($RANDOM % 100))
 RUN_ID="run_$RAND_ID"
 
 regular_tables="v_internal.dc_requests_issued v_internal.dc_query_executions v_internal.dc_explain_plans  v_monitor.query_profiles v_monitor.execution_engine_profiles v_monitor.resource_acquisitions v_monitor.query_consumption v_monitor.host_resources public.collection_info public.collection_events v_internal.dc_slow_events v_monitor.query_events"
 
-LOCAL_TEMP_DIR="/scratch_b/ughumman/temp/temp_${RAND_ID}"
+# If LOCAL_DIRECTORY is not provided, set it to a default value or handle it accordingly
+if [ -z "$LOCAL_DIRECTORY" ]; then
+    echo "TABLE_DIRECTORY not provided. Using default value."
+    LOCAL_DIRECTORY="."
+fi
+
+LOCAL_TEMP_DIR="${LOCAL_DIRECTORY}/temp_${RAND_ID}"
 TEMP_BUNDLE="${LOCAL_TEMP_DIR}/bundle"
 rm -rf $LOCAL_TEMP_DIR
 mkdir -p $LOCAL_TEMP_DIR
