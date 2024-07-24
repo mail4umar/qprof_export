@@ -13,7 +13,7 @@ QUERY_USER_PASSWORD='""'
 
 # Database credentials for administrative operations
 ADMIN_USER="ughumman"
-ADMIN_PASSWORD=""
+ADMIN_PASSWORD=''
 
 # Local directory for temporarily storing parquet files
 LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
