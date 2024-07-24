@@ -18,8 +18,8 @@ regular_tables="v_internal.dc_requests_issued v_internal.dc_query_executions v_i
 
 # If LOCAL_DIRECTORY is not provided, set it to a default value or handle it accordingly
 if [ -z "$LOCAL_DIRECTORY" ]; then
-    echo "TABLE_DIRECTORY not provided. Using default value."
-    LOCAL_DIRECTORY="."
+    echo "LOCAL_DIRECTORY not provided. Using current value of $PWD ."
+    LOCAL_DIRECTORY=$PWD
 fi
 
 LOCAL_TEMP_DIR="${LOCAL_DIRECTORY}/temp_${RAND_ID}"
@@ -39,6 +39,7 @@ $VSQL -a -c "truncate table ${TARGET_SCHEMA}.export_events;"
 
 # Initialize an empty metadata JSON file
 METADATA_FILE="${TEMP_BUNDLE}/metadata.json"
+# The version refers to the BundleVersion from VerticaPy.performance.vertica.collection_tables.py
 echo "{\"version\": \"2\", \"tables\": [" > $METADATA_FILE
 
 for t in $regular_tables
@@ -139,15 +140,21 @@ echo "]}" >> $METADATA_FILE
 
 WORKING_DIR=$PWD
 pushd ${TEMP_BUNDLE}
-tar cvf "${WORKING_DIR}/${TARGET_SCHEMA}.tar" *.parquet metadata.json
+# If there is a tar file creation failure, this will cause the entire script to fail and stop due to the "-o pipefail" command at the top.
+tar cvfz "${WORKING_DIR}/${TARGET_SCHEMA}.tar.gz" *.parquet metadata.json
 popd
-ls -lrth ${TARGET_SCHEMA}.tar
+echo 
+ls -lrth ${TARGET_SCHEMA}.tar.gz
 
 $VSQL -a -c "select * from ${TARGET_SCHEMA}.export_events"
+# If you want to keep the files, comment out the line directly below.
+rm -rf $LOCAL_TEMP_DIR
 
 echo "TARGET_SCHEMA was $TARGET_SCHEMA"
 echo "---------------------------------------------------"
 echo "RUN ID  was $RUN_ID"
 echo "Worked with temp dir $LOCAL_TEMP_DIR"
+echo "---------------------------------------------------"
+echo "Your final TAR file is: $TARGET_SCHEMA.tar.gz"
 echo "---------------------------------------------------"
 echo "DONE"

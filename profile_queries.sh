@@ -78,7 +78,7 @@ else
     if $VSQL_ADMIN_COMMAND -t -c "SELECT COUNT(*) FROM v_catalog.schemata WHERE schema_name = '$TARGET_SCHEMA';" | grep -q '0'; then
         echo "Schema '$TARGET_SCHEMA' does not exist. It will be created."
     else
-        echo "Error: Schema '$TARGET_SCHEMA' already exists. Please provide a different schema name or omit it to generate a random schema."
+        echo "Error: Schema '$TARGET_SCHEMA' already exists. Please provide a different unique schema name or omit it to automatically generate a new schema name."
         exit 1
     fi
 fi
@@ -86,7 +86,7 @@ fi
 echo "Using schema name: $TARGET_SCHEMA"
 
 RAND_ID=$(($RANDOM % 100))
-RUN_ID="run_$RAND_ID"
+RUN_ID="run_qprof_export_$RAND_ID"
 SCRATCH_DIR=${PWD}/$RUN_ID
 echo "---------------------------------------------------"
 echo "RUN_ID = $RUN_ID"
@@ -257,7 +257,7 @@ done < "$CONFIG_FILE"
 for t in $SOURCE_TABLES
 do
     echo "---------------------------------------------"
-    echo "Collecting from Source Table is $t"
+    echo "Collecting from Source Table $t"
     echo "---------------------------------------------"
     ORIGINAL_SCHEMA="${t%%.*}"
     TABLE_NAME="${t##*.}"
@@ -296,10 +296,10 @@ done
 # Show a summary table
 $VSQL_ADMIN_COMMAND -a -c "select transaction_id, statement_id, table_name, sum(row_count) from $TARGET_SCHEMA.collection_events group by 1, 2, 3 order by 1, 2, 3"
 
-
+rm -rf $SCRATCH_DIR
 
 echo "Done with script collecting into $TARGET_SCHEMA. Profiled ${PROF_COUNT} queries" 
 
-echo "Next - Run the export script"
+echo "Next - Now running the export script with Target schema: $TARGET_SCHEMA and Local Directory: $LOCAL_DIRECTORY"
 
-./export.sh "$TARGET_SCHEMA" "$LOCAL_DIRECTORY"
+./export.sh "$TARGET_SCHEMA" "$PWD"
