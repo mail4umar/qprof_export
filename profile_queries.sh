@@ -1,5 +1,6 @@
 #!/bin/bash
-# MODIFIED BY UMAR - 7/22/2024
+# Based off Jason Slaunwhite code for exporting query profiling information
+# MODIFIED BY UMAR FAROOQ GHUMMAN - 7/24/2024
 # This script profiles queries and optionally creates a schema if not provided
 
 ##############################
@@ -20,23 +21,65 @@ LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
 # For tracking
 PROJECT_NAME="test"
 CUSTOMER_NAME="XYZ"
-##############################
+###############################
 # END USER CONFIGURATION      #
-##############################
-
+###############################
 
 set -euo pipefail
 
+# Adding input options
+
+usage() {
+    echo "\
+$0 accepts inputs as follow:
+
+Usage: $0
+
+    Options:
+    -j, --job_file          [Required] eg. foo.txt
+    -s, --target_schema     [Optional] eg. test_01 (The schema name should be unused)
+
+    Help:
+    -h, --help              [Help] Show this help info
+
+For example:
+    $0 \
+-j foo.txt \
+-s test_01"
+}
+# end of function usage()
+
+# List of parameter flags
+TEMP=$(getopt -o j:s:h --long job_file:,target_schema:,help -n 'ERROR: $0' -- "$@")
+
+if [ $? != 0 ] ; then usage ; exit ; fi
+eval set -- "$TEMP"
+
+# Bind each parameter NAME
+job_file=""
+target_schema=""
+
+while true ; do
+    # Matching parameter FLAGS to parameter NAMES
+    case "$1" in
+        -j|--job_file)         job_file=$2; shift 2;;
+        -s|--target_schema)    target_schema=$2; shift 2;;
+        -h|--help)             usage; exit 0;;
+        --)                    shift; break;;
+        *)                     break;;
+    esac
+done
+
+# Check for any MISSING required parameters
+if [ "x${job_file}" = "x" ]; then usage; echo "ERROR: --job_file option must be provided."; exit 1; fi
+
+# End of options
+
+JOB_FILE="$job_file"
+TARGET_SCHEMA="${target_schema:-}"
+
 SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
 SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
-
-if [ "$#" -lt  "1" ]; then
-    echo "Usage: $0 JOB_FILE [target_schema]"
-    exit 1
-fi
-
-JOB_FILE="$1"
-TARGET_SCHEMA="${2:-}"
 
 if [ ! -e "$JOB_FILE" ]; then
     echo "Configuration file $JOB_FILE does not exist"
