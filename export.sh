@@ -7,7 +7,7 @@ if [ "$#" -lt  "1" ]; then
     exit 1
 fi
 
-VSQL=${VSQL:-vsql}
+VSQL=${VSQL_ADMIN_COMMAND:-${VSQL:-vsql}}
 TARGET_SCHEMA="$1"
 LOCAL_DIRECTORY="${2:-}"
 
