@@ -30,10 +30,10 @@ ADMIN_USER="ughumman"
 ADMIN_PASSWORD=""
 ```
 
-Provide a local directory where the parquet files can be saved temporarily:
+Provide a local directory where the parquet files can be saved temporarily. The user should have write permissions for this diretory. By default present working directory will be used.
 
 ```
-LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
+LOCAL_DIRECTORY="$PWD"
 ```
 
 Then optionally add project/customer info:
