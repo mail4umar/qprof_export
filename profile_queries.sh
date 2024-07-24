@@ -216,7 +216,7 @@ do
     fi
     USER_LABEL=$(echo $line | cut -d '|' -f 1)
     USER_COMMENT=$(echo $line | cut -d '|' -f 2)
-    QUERY_FILE=$(echo $line | cut -d '|' -f 3)
+    QUERY_FILE=$(echo $line | cut -d '|' -f 3 | tr -d ' ')
 
     if [ -z "$USER_LABEL" ]; then
         echo "Line $LINE_COUNT has empty user label: '$line'"
