@@ -9,7 +9,7 @@ This repo consists of a script to export the results of a ``PROFILE`` of a set o
 - "dbadmin" access
 
 ## Install 
-Just copy the entire folder somewhere on your system and make the following two files executable (chmod u+x qprof.sh):
+Just copy the entire folder somewhere on your system and make the following two files executable (chmod u+x <file_name>):
 
 1. profile_queries.sh
 2. export.sh
