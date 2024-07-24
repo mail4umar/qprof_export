@@ -68,10 +68,14 @@ The script takes two inputs:
 
 For example:
 
+``./profile_queries.sh --job_file foo.txt --target_schema custom_schema``
+OR
 ``./profile_queries.sh -j foo.txt -s custom_schema``
 
 Note that the schema is optional. You can also just do:
 
+``./profile_queries.sh --job_file foo.txt``
+OR
 ``./profile_queries.sh -j foo.txt``
 
 To get help, simple call:
