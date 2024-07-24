@@ -31,15 +31,15 @@ SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
 SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
 
 if [ "$#" -lt  "1" ]; then
-    echo "Usage: $0 config_file [target_schema]"
+    echo "Usage: $0 JOB_FILE [target_schema]"
     exit 1
 fi
 
-CONFIG_FILE="$1"
+JOB_FILE="$1"
 TARGET_SCHEMA="${2:-}"
 
-if [ ! -e "$CONFIG_FILE" ]; then
-    echo "Configuration file $CONFIG_FILE does not exist"
+if [ ! -e "$JOB_FILE" ]; then
+    echo "Configuration file $JOB_FILE does not exist"
     exit 1
 fi
 
@@ -252,7 +252,7 @@ do
     PROF_COUNT=$((PROF_COUNT +1))
     echo "Done with query $USER_LABEL count $PROF_COUNT"
 
-done < "$CONFIG_FILE"
+done < "$JOB_FILE"
 
 for t in $SOURCE_TABLES
 do

@@ -1,1 +1,2 @@
 bla | random |test_queries.sql
+# END OF FILE - DO NOT REMOVE #
