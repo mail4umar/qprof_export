@@ -16,7 +16,7 @@ ADMIN_USER="ughumman"
 ADMIN_PASSWORD=""
 
 # Local directory for temporarily storing parquet files
-LOCAL_DIRECTORY="/scratch_b/ughumman/temp"
+LOCAL_DIRECTORY="$PWD"
 
 # For tracking
 PROJECT_NAME="test"
@@ -345,4 +345,4 @@ echo "Done with script collecting into $TARGET_SCHEMA. Profiled ${PROF_COUNT} qu
 
 echo "Next - Now running the export script with Target schema: $TARGET_SCHEMA and Local Directory: $LOCAL_DIRECTORY"
 
-./export.sh "$TARGET_SCHEMA" "$PWD"
+./export.sh "$TARGET_SCHEMA" "$LOCAL_DIRECTORY"
