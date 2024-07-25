@@ -13,7 +13,7 @@ QUERY_USER_PASSWORD='""'
 
 # Database credentials for administrative operations
 ADMIN_USER="ughumman"
-ADMIN_PASSWORD=""
+ADMIN_PASSWORD=''
 
 # Local directory for temporarily storing parquet files
 LOCAL_DIRECTORY="$PWD"
@@ -95,7 +95,7 @@ fi
 
 VSQL=${VSQL:-vsql}
 
-VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD"
+export VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD"
 VSQL_USER_COMMAND="${VSQL} -U $QUERY_USER -w $QUERY_USER_PASSWORD"
 
 # Function to generate a random schema name
