@@ -4,7 +4,7 @@ This repo consists of a script to export the results of a ``PROFILE`` of a set o
 # How to install 
 ## Prerequisisites
 
-- vsql
+- vsql (make sure that vsql can be directly run from your terminal)
 - bash
 - `dbadmin` access
 
@@ -28,6 +28,27 @@ QUERY_USER_PASSWORD='""'
 # Database credentials for administrative operations
 ADMIN_USER="ughumman"
 ADMIN_PASSWORD=""
+```
+
+If you do not want to write your password to file, instead you can create environment variables:
+
+1. Export the passwords:
+
+```
+export QUERY_USER_PASSWORD='your_query_user_password'
+export ADMIN_PASSWORD='your_admin_password'
+```
+
+2. Edit the ``profile_queries.sh`` to include those into them:
+
+```
+# Database credentials for query execution
+QUERY_USER="ughumman"
+QUERY_USER_PASSWORD="${QUERY_USER_PASSWORD}"
+
+# Database credentials for administrative operations
+ADMIN_USER="ughumman"
+ADMIN_PASSWORD="${ADMIN_PASSWORD}"
 ```
 
 Provide a local directory where the parquet files can be saved temporarily. The user should have write permissions for this diretory. By default present working directory will be used.
