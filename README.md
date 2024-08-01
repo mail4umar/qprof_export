@@ -88,7 +88,7 @@ The script takes two inputs:
 
     The SQL files should only contain SQL queries that need to be profiled.
 
-   If the user is not worries about labels and comments, then they can just change the path of SQL file to work with the script.
+   If the user is not worried about labels and comments, then they can just change the path of SQL file to work with the script.
 
 
 3. Schema name [Optional]
