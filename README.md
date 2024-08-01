@@ -78,12 +78,20 @@ The script takes two inputs:
     The last line should always be:
     "# END OF FILE - DO NOT REMOVE #"
 
-    Look at the example file `foo.txt`
+    Look at the example file `foo.txt`. There is an example for the users to follow.
+
+    ```
+    bla | random |test_queries.sql
+    # END OF FILE - DO NOT REMOVE #
+    ```
+    In the example above the User Label is "bla", User Comment is "random", and the SQL file name is "test_queries.sql".
 
     The SQL files should only contain SQL queries that need to be profiled.
 
+   If the user is not worries about labels and comments, then they can just change the path of SQL file to work with the script.
 
-2. Schema name [Optional]
+
+3. Schema name [Optional]
 
     This schema name is used to create a schema inside the database where the results are stored temporarily before exporting to a parquet format. If the user does not provide a schema, then a random schema is generated (e.g., `schema_1ec719a09698cc6d`)..
 
