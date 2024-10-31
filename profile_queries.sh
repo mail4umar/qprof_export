@@ -38,6 +38,7 @@ Usage: $0
     Options:
     -j, --job_file          [Required] eg. foo.txt
     -s, --target_schema     [Optional] eg. test_01 (The schema name should be unused)
+    -t, --transactions      [Optional] txn_id,stmt_id (Profile an existing transaction)
 
     Help:
     -h, --help              [Help] Show this help info
@@ -45,25 +46,27 @@ Usage: $0
 For example:
     $0 \
 -j foo.txt \
--s test_01"
+-s test_01 \
+-t 12345,67890"
 }
 # end of function usage()
 
 # List of parameter flags
-TEMP=$(getopt -o j:s:h --long job_file:,target_schema:,help -n 'ERROR: $0' -- "$@")
+TEMP=$(getopt -o j:s:t:h --long job_file:,target_schema:,transactions:,help -n 'ERROR: $0' -- "$@")
 
-if [ $? != 0 ] ; then usage ; exit ; fi
+if [ $? != 0 ]; then usage; exit; fi
 eval set -- "$TEMP"
 
 # Bind each parameter NAME
 job_file=""
 target_schema=""
+transactions=""
 
-while true ; do
-    # Matching parameter FLAGS to parameter NAMES
+while true; do
     case "$1" in
         -j|--job_file)         job_file=$2; shift 2;;
         -s|--target_schema)    target_schema=$2; shift 2;;
+        -t|--transactions)     transactions=$2; shift 2;;
         -h|--help)             usage; exit 0;;
         --)                    shift; break;;
         *)                     break;;
@@ -72,6 +75,17 @@ done
 
 # Check for any MISSING required parameters
 if [ "x${job_file}" = "x" ]; then usage; echo "ERROR: --job_file option must be provided."; exit 1; fi
+
+# Extract txn_id and stmt_id from transactions input
+TXN_ID=""
+STMT_ID=""
+if [ -n "$transactions" ]; then
+    IFS=',' read -r TXN_ID STMT_ID <<< "$transactions"
+    if [ -z "$TXN_ID" ] || [ -z "$STMT_ID" ]; then
+        echo "ERROR: --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
+        exit 1
+    fi
+fi
 
 # End of options
 
@@ -206,96 +220,104 @@ $VSQL_ADMIN_COMMAND -a -c "create table if not exists $TARGET_SCHEMA.collection_
 
 PROF_COUNT=0
 LINE_COUNT=0
-
-while read -r line;
-do
-    LINE_COUNT=$(($LINE_COUNT + 1))
-    if [[ $line == "#"* ]]; then
-        echo "Skipping comment on line num $LINE_COUNT, '$line'"
-        continue
-    fi
-    USER_LABEL=$(echo $line | cut -d '|' -f 1)
-    USER_COMMENT=$(echo $line | cut -d '|' -f 2)
-    QUERY_FILE=$(echo $line | cut -d '|' -f 3 | tr -d ' ')
-
-    if [ -z "$USER_LABEL" ]; then
-        echo "Line $LINE_COUNT has empty user label: '$line'"
-        exit 1
-    fi
-
-    if [ -z "$USER_COMMENT" ]; then
-        echo "Line $LINE_COUNT has empty user comment: '$line'"
-        exit 1
-    fi
-
-    if [ -z "$QUERY_FILE" ]; then
-        echo "Line $LINE_COUNT has empty user comment: '$line'"
-        exit 1
-    fi
-
-    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-    echo "Query: $USER_LABEL, '$USER_COMMENT', $QUERY_FILE"
-
-    QUERY_FILE_BASENAME=$(basename "$QUERY_FILE")
-
-    echo "Adding profile statement..."
-    SCRATCH_QUERY_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}
-
-    cp -v "${QUERY_FILE}" "${SCRATCH_QUERY_FILE}"
-
-    # The following sed command adds profiling ONCE
-    sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt])/{s#(^\(?WITH|^\(?SELECT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
-
-    # the follow sed command extends the hint to have a label
-    if grep -c '/[*][+]' ${SCRATCH_QUERY_FILE}; then
-	# Case - there is a hint in the query already
-	# INPUT: select /*+opt_dir('V2OptDisableJoinRanks=true')*/ ...
-	# OUTPUT: select /*+opt_dir('V2OptDisableJoinRanks=true'), label('CQCS')*/
-	# We must extend the query hint: distinct hints are not allowed
-	# It follows that there is exactly one hint the input query: otherwise, the
-	# query would be invalid
-	sed -i -r -e "s#/[*][+](.*)\)[*]/#/*+\1\), label('$USER_LABEL')*/#" ${SCRATCH_QUERY_FILE}
-    else
-	# Case - there is no hint in the query already
-	sed -i -r -e "0,/(^WITH|^SELECT)/{s#(^WITH|^SELECT)# \1 /*+label('$USER_LABEL')*/ #}" ${SCRATCH_QUERY_FILE}
-    fi
-
-    echo "Begin query execution"
-
-    PROFILE_NOTICE_FILE=$SCRATCH_DIR/${QUERY_FILE_BASENAME}.prof_msg
-    time $VSQL_USER_COMMAND -o /dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
-    echo "Query execution complete"
-    cat $PROFILE_NOTICE_FILE
-    QUERY_ID_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}.qid
-    grep '^HINT:' $PROFILE_NOTICE_FILE | sed 's#.*transaction_id=\([0-9]\+\) and statement_id=\([0-9]\+\).*#\1|\2#' > $QUERY_ID_FILE
-    combo_tid_sid=$(cat ${QUERY_ID_FILE})
-    TXN_ID=`echo $combo_tid_sid | cut -f1 -d '|'`
-    STMT_ID=`echo $combo_tid_sid | cut -f2 -d '|'`
-
-    echo "TXN: $TXN_ID"
-    echo "STMT: $STMT_ID"
-    if [ -z "$TXN_ID" ]; then
-	    echo "Error: TXN_ID was empty, combo_tid_sid was $combo_tid_sid"
-	    exit 1
-    fi
-    $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$USER_LABEL', '$USER_COMMENT', '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
-
-    for t in $SNAPSHOT_TABLES
+# Use provided txn_id and stmt_id if available, otherwise execute the profiling as usual
+if [ -n "$TXN_ID" ] && [ -n "$STMT_ID" ]; then
+    echo "Profiling existing transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
+    $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
+else
+    # Process profiling based on provided job file if no transaction details were given
+    echo "Processing new queries from job file..."
+        
+    while read -r line;
     do
-	echo "---------------------------------------------"
-	echo "Collecting from SNAPSHOT Source Table is $t"
-	echo "---------------------------------------------"
-	ORIGINAL_SCHEMA="${t%%.*}"
-	TABLE_NAME="${t##*.}"
+        LINE_COUNT=$(($LINE_COUNT + 1))
+        if [[ $line == "#"* ]]; then
+            echo "Skipping comment on line num $LINE_COUNT, '$line'"
+            continue
+        fi
+        USER_LABEL=$(echo $line | cut -d '|' -f 1)
+        USER_COMMENT=$(echo $line | cut -d '|' -f 2)
+        QUERY_FILE=$(echo $line | cut -d '|' -f 3 | tr -d ' ')
 
-	time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+        if [ -z "$USER_LABEL" ]; then
+            echo "Line $LINE_COUNT has empty user label: '$line'"
+            exit 1
+        fi
 
-    done
+        if [ -z "$USER_COMMENT" ]; then
+            echo "Line $LINE_COUNT has empty user comment: '$line'"
+            exit 1
+        fi
 
-    PROF_COUNT=$((PROF_COUNT +1))
-    echo "Done with query $USER_LABEL count $PROF_COUNT"
+        if [ -z "$QUERY_FILE" ]; then
+            echo "Line $LINE_COUNT has empty user comment: '$line'"
+            exit 1
+        fi
 
-done < "$JOB_FILE"
+        echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+        echo "Query: $USER_LABEL, '$USER_COMMENT', $QUERY_FILE"
+
+        QUERY_FILE_BASENAME=$(basename "$QUERY_FILE")
+
+        echo "Adding profile statement..."
+        SCRATCH_QUERY_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}
+
+        cp -v "${QUERY_FILE}" "${SCRATCH_QUERY_FILE}"
+
+        # The following sed command adds profiling ONCE
+        sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt])/{s#(^\(?WITH|^\(?SELECT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
+
+        # the follow sed command extends the hint to have a label
+        if grep -c '/[*][+]' ${SCRATCH_QUERY_FILE}; then
+        # Case - there is a hint in the query already
+        # INPUT: select /*+opt_dir('V2OptDisableJoinRanks=true')*/ ...
+        # OUTPUT: select /*+opt_dir('V2OptDisableJoinRanks=true'), label('CQCS')*/
+        # We must extend the query hint: distinct hints are not allowed
+        # It follows that there is exactly one hint the input query: otherwise, the
+        # query would be invalid
+        sed -i -r -e "s#/[*][+](.*)\)[*]/#/*+\1\), label('$USER_LABEL')*/#" ${SCRATCH_QUERY_FILE}
+        else
+        # Case - there is no hint in the query already
+        sed -i -r -e "0,/(^WITH|^SELECT)/{s#(^WITH|^SELECT)# \1 /*+label('$USER_LABEL')*/ #}" ${SCRATCH_QUERY_FILE}
+        fi
+
+        echo "Begin query execution"
+
+        PROFILE_NOTICE_FILE=$SCRATCH_DIR/${QUERY_FILE_BASENAME}.prof_msg
+        time $VSQL_USER_COMMAND -o /dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
+        echo "Query execution complete"
+        cat $PROFILE_NOTICE_FILE
+        QUERY_ID_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}.qid
+        grep '^HINT:' $PROFILE_NOTICE_FILE | sed 's#.*transaction_id=\([0-9]\+\) and statement_id=\([0-9]\+\).*#\1|\2#' > $QUERY_ID_FILE
+        combo_tid_sid=$(cat ${QUERY_ID_FILE})
+        TXN_ID=`echo $combo_tid_sid | cut -f1 -d '|'`
+        STMT_ID=`echo $combo_tid_sid | cut -f2 -d '|'`
+
+        echo "TXN: $TXN_ID"
+        echo "STMT: $STMT_ID"
+        if [ -z "$TXN_ID" ]; then
+            echo "Error: TXN_ID was empty, combo_tid_sid was $combo_tid_sid"
+            exit 1
+        fi
+        $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$USER_LABEL', '$USER_COMMENT', '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
+
+        for t in $SNAPSHOT_TABLES
+        do
+        echo "---------------------------------------------"
+        echo "Collecting from SNAPSHOT Source Table is $t"
+        echo "---------------------------------------------"
+        ORIGINAL_SCHEMA="${t%%.*}"
+        TABLE_NAME="${t##*.}"
+
+        time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+
+        done
+
+        PROF_COUNT=$((PROF_COUNT +1))
+        echo "Done with query $USER_LABEL count $PROF_COUNT"
+
+    done < "$JOB_FILE"
+fi
 
 for t in $SOURCE_TABLES
 do
