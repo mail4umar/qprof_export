@@ -4,12 +4,12 @@ This repo consists of a script to export the results of a ``PROFILE`` of a set o
 # How to install 
 ## Prerequisisites
 
-- vsql (make sure that vsql can be directly run from your terminal)
+- vsql (make sure that vsql can be directly run from your terminal on your target database)
 - bash
 - `dbadmin` access
 
 ## Install 
-Just copy the entire folder somewhere on your system and make the following two files executable (chmod u+x <file_name>):
+Just copy the entire folder somewhere on a system and make the following two files executable (chmod u+x <file_name>):
 
 1. profile_queries.sh
 2. export.sh
