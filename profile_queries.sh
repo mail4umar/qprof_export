@@ -38,6 +38,7 @@ Usage: $0
     Options:
     -j, --job_file          [Required] eg. foo.txt
     -s, --target_schema     [Optional] eg. test_01 (The schema name should be unused)
+    -t, --transactions      [Optional] txn_id,stmt_id (Profile an existing transaction)
 
     Help:
     -h, --help              [Help] Show this help info
@@ -45,25 +46,27 @@ Usage: $0
 For example:
     $0 \
 -j foo.txt \
--s test_01"
+-s test_01 \
+-t 12345,67890"
 }
 # end of function usage()
 
 # List of parameter flags
-TEMP=$(getopt -o j:s:h --long job_file:,target_schema:,help -n 'ERROR: $0' -- "$@")
+TEMP=$(getopt -o j:s:t:h --long job_file:,target_schema:,transactions:,help -n 'ERROR: $0' -- "$@")
 
-if [ $? != 0 ] ; then usage ; exit ; fi
+if [ $? != 0 ]; then usage; exit; fi
 eval set -- "$TEMP"
 
 # Bind each parameter NAME
 job_file=""
 target_schema=""
+transactions=""
 
-while true ; do
-    # Matching parameter FLAGS to parameter NAMES
+while true; do
     case "$1" in
         -j|--job_file)         job_file=$2; shift 2;;
         -s|--target_schema)    target_schema=$2; shift 2;;
+        -t|--transactions)     transactions=$2; shift 2;;
         -h|--help)             usage; exit 0;;
         --)                    shift; break;;
         *)                     break;;
@@ -72,6 +75,17 @@ done
 
 # Check for any MISSING required parameters
 if [ "x${job_file}" = "x" ]; then usage; echo "ERROR: --job_file option must be provided."; exit 1; fi
+
+# Extract txn_id and stmt_id from transactions input
+TXN_ID=""
+STMT_ID=""
+if [ -n "$transactions" ]; then
+    IFS=',' read -r TXN_ID STMT_ID <<< "$transactions"
+    if [ -z "$TXN_ID" ] || [ -z "$STMT_ID" ]; then
+        echo "ERROR: --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
+        exit 1
+    fi
+fi
 
 # End of options
 
