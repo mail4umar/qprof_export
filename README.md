@@ -27,8 +27,10 @@ QUERY_USER_PASSWORD='""'
 
 # Database credentials for administrative operations
 ADMIN_USER="ughumman"
-ADMIN_PASSWORD=""
+ADMIN_PASSWORD='""'
 ```
+
+Note: Above is an example of an empty password. You need nested double quotes inside single quotes.
 
 If you do not want to write your password to file, instead you can create environment variables:
 
