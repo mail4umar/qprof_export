@@ -73,8 +73,16 @@ while true; do
     esac
 done
 
-# Check for any MISSING required parameters
-if [ "x${job_file}" = "x" ]; then usage; echo "ERROR: --job_file option must be provided."; exit 1; fi
+# Enforce either job_file or transactions, but not both
+if [ -z "$job_file" ] && [ -z "$transactions" ]; then
+    usage
+    echo "ERROR: Either --job_file or --transactions must be provided."
+    exit 1
+elif [ -n "$job_file" ] && [ -n "$transactions" ]; then
+    usage
+    echo "ERROR: Provide either --job_file or --transactions, but not both."
+    exit 1
+fi
 
 # Extract txn_id and stmt_id from transactions input
 TXN_ID=""
