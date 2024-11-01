@@ -81,10 +81,10 @@ The script takes two inputs:
     Look at the example file `foo.txt`. There is an example for the users to follow.
 
     ```
-    bla | random |test_queries.sql
+    query_batch_1 | random |test_queries.sql
     # END OF FILE - DO NOT REMOVE #
     ```
-    In the example above the User Label is "bla", User Comment is "random", and the SQL file name is "test_queries.sql".
+    In the example above the User Label is "query_batch_1", User Comment is "random", and the SQL file name is "test_queries.sql".
 
     The SQL files should only contain SQL queries that need to be profiled.
 
