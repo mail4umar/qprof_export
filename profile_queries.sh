@@ -95,16 +95,15 @@ if [ -n "$transactions" ]; then
     fi
 else
     JOB_FILE="$job_file"
-    TARGET_SCHEMA="${target_schema:-}"
-
-    SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
-    SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
-
     if [ ! -e "$JOB_FILE" ]; then
         echo "Configuration file $JOB_FILE does not exist"
         exit 1
     fi
 fi
+
+TARGET_SCHEMA="${target_schema:-}"
+SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
+SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
 # End of options
 
 SQL_DIR="${SCRIPT_PATH}/sql"
