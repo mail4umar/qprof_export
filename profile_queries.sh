@@ -93,20 +93,19 @@ if [ -n "$transactions" ]; then
         echo "ERROR: --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
         exit 1
     fi
-fi
+else
+    JOB_FILE="$job_file"
+    TARGET_SCHEMA="${target_schema:-}"
 
+    SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
+    SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
+
+    if [ ! -e "$JOB_FILE" ]; then
+        echo "Configuration file $JOB_FILE does not exist"
+        exit 1
+    fi
+fi
 # End of options
-
-JOB_FILE="$job_file"
-TARGET_SCHEMA="${target_schema:-}"
-
-SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
-SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
-
-if [ ! -e "$JOB_FILE" ]; then
-    echo "Configuration file $JOB_FILE does not exist"
-    exit 1
-fi
 
 SQL_DIR="${SCRIPT_PATH}/sql"
 
