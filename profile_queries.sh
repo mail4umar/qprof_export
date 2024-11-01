@@ -98,6 +98,22 @@ VSQL=${VSQL:-vsql}
 export VSQL_ADMIN_COMMAND="${VSQL} -U $ADMIN_USER -w $ADMIN_PASSWORD"
 VSQL_USER_COMMAND="${VSQL} -U $QUERY_USER -w $QUERY_USER_PASSWORD"
 
+# Authentication check for QUERY_USER
+DUMMY_SQL="SELECT 1"
+
+if ! echo "$DUMMY_SQL" | $VSQL_USER_COMMAND >/dev/null 2>&1; then
+    echo "ERROR: Authentication failed for QUERY_USER '$QUERY_USER'"
+    exit 1
+fi
+
+# Authentication check for ADMIN_USER
+if ! echo "$DUMMY_SQL" | $VSQL_ADMIN_COMMAND >/dev/null 2>&1; then
+    echo "ERROR: Authentication failed for ADMIN_USER '$ADMIN_USER'"
+    exit 1
+fi
+
+echo "Authentication successful for both QUERY_USER and ADMIN_USER."
+
 # Function to generate a random schema name
 generate_random_schema() {
     local SCHEMA_NAME
