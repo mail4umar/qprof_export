@@ -253,7 +253,7 @@ if [ -n "$TXN_ID" ] && [ -n "$STMT_ID" ]; then
     echo "---------------------------------------------"
     ORIGINAL_SCHEMA="${t%%.*}"
     TABLE_NAME="${t##*.}"
-    time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+    time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
     done
     PROF_COUNT=$((PROF_COUNT +1))
 else
