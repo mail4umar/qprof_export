@@ -244,8 +244,18 @@ PROF_COUNT=0
 LINE_COUNT=0
 # Use provided txn_id and stmt_id if available, otherwise execute the profiling as usual
 if [ -n "$TXN_ID" ] && [ -n "$STMT_ID" ]; then
-    echo "Profiling existing transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
+    echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
     $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
+    for t in $SNAPSHOT_TABLES
+    do
+    echo "---------------------------------------------"
+    echo "Collecting from SNAPSHOT Source Table is $t"
+    echo "---------------------------------------------"
+    ORIGINAL_SCHEMA="${t%%.*}"
+    TABLE_NAME="${t##*.}"
+    time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+    done
+    PROF_COUNT=$((PROF_COUNT +1))
 else
     # Process profiling based on provided job file if no transaction details were given
     echo "Processing new queries from job file..."

@@ -107,16 +107,13 @@ do
     ROWS_FILE=$LOCAL_TEMP_DIR/${table}_rows.sql
     time $VSQL -At -c "export to parquet (directory='$TABLE_DIRECTORY', filename='$table', compression='gzip') as select $COLS from $TARGET_SCHEMA.$table" > $ROWS_FILE
     rows=$(cat $ROWS_FILE)
-    if [ "$rows" -eq 0 ]; then
-        echo "Table $t has no data. No Parquet file created."
-    else
-        $VSQL -a -c "insert into ${TARGET_SCHEMA}.export_events VALUES ('$table', 'export', $rows); commit"
-        echo "Table $t exported rows $rows"
-        cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
+    $VSQL -a -c "insert into ${TARGET_SCHEMA}.export_events VALUES ('$table', 'export', $rows); commit"
+    echo "Table $t exported rows $rows"
+    cp ${TABLE_DIRECTORY}/${table}.parquet ${TEMP_BUNDLE}
     
     # Append metadata to JSON file
     echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
-    fi
+
 done
 
 for t in "${TARGET_SCHEMA}.export_events"
