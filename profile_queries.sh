@@ -85,14 +85,24 @@ elif [ -n "$job_file" ] && [ -n "$transactions" ]; then
 fi
 
 # Extract txn_id and stmt_id from transactions input
-TXN_ID=""
-STMT_ID=""
+TXN_IDS=()
+STMT_IDS=()
+
 if [ -n "$transactions" ]; then
-    IFS=',' read -r TXN_ID STMT_ID <<< "$transactions"
-    if [ -z "$TXN_ID" ] || [ -z "$STMT_ID" ]; then
-        echo "ERROR: --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
-        exit 1
-    fi
+    # Split the input into pairs by semicolons
+    IFS=';' read -ra PAIRS <<< "$transactions"
+    for pair in "${PAIRS[@]}"; do
+        IFS=',' read -r txn_id stmt_id <<< "$pair"
+        
+        # Validate each pair
+        if [ -z "$txn_id" ] || [ -z "$stmt_id" ]; then
+            echo "ERROR: Each pair in --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
+            exit 1
+        fi
+        
+        TXN_IDS+=("$txn_id")
+        STMT_IDS+=("$stmt_id")
+    done
 else
     JOB_FILE="$job_file"
     if [ ! -e "$JOB_FILE" ]; then
@@ -100,6 +110,7 @@ else
         exit 1
     fi
 fi
+
 
 TARGET_SCHEMA="${target_schema:-}"
 SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
@@ -243,19 +254,24 @@ $VSQL_ADMIN_COMMAND -a -c "create table if not exists $TARGET_SCHEMA.collection_
 PROF_COUNT=0
 LINE_COUNT=0
 # Use provided txn_id and stmt_id if available, otherwise execute the profiling as usual
-if [ -n "$TXN_ID" ] && [ -n "$STMT_ID" ]; then
-    echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
-    $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
-    for t in $SNAPSHOT_TABLES
-    do
-    echo "---------------------------------------------"
-    echo "Collecting from SNAPSHOT Source Table is $t"
-    echo "---------------------------------------------"
-    ORIGINAL_SCHEMA="${t%%.*}"
-    TABLE_NAME="${t##*.}"
-    time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+if [ ${#TXN_IDS[@]} -gt 0 ]; then
+    for (( i=0; i<${#TXN_IDS[@]}; i++ )); do
+        TXN_ID="${TXN_IDS[i]}"
+        STMT_ID="${STMT_IDS[i]}"
+        
+        echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
+        $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
+
+        for t in $SNAPSHOT_TABLES; do
+            echo "---------------------------------------------"
+            echo "Collecting from SNAPSHOT Source Table is $t"
+            echo "---------------------------------------------"
+            ORIGINAL_SCHEMA="${t%%.*}"
+            TABLE_NAME="${t##*.}"
+            time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+        done
+        PROF_COUNT=$((PROF_COUNT + 1))
     done
-    PROF_COUNT=$((PROF_COUNT +1))
 else
     # Process profiling based on provided job file if no transaction details were given
     echo "Processing new queries from job file..."
