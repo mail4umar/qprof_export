@@ -173,6 +173,20 @@ generate_random_schema() {
     done
 }
 
+# Function to check whether the query has the word 'PROFILE' in it
+has_profile() {
+    # Execute the query and capture the output
+    OUTPUT=$(vsql -c "SELECT request FROM query_requests WHERE transaction_id=$TXN_ID AND statement_id=$STMT_ID AND request ILIKE 'PROFILE%';")
+
+    # Check if the output contains more than just the header and row count
+    if echo "$OUTPUT" | grep -qE '^[[:space:]]*PROFILE'; then
+        echo "The query contains the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID':"
+    else
+        echo "ERROR: The query does not contain the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID'"
+        exit 1
+    fi
+}
+
 # Check and handle target schema
 if [ -z "$TARGET_SCHEMA" ]; then
     # No schema provided, generate a random one
@@ -274,6 +288,12 @@ if [ ${#TXN_IDS[@]} -gt 0 ]; then
         TXN_ID="${TXN_IDS[i]}"
         STMT_ID="${STMT_IDS[i]}"
         
+        echo "Checking whether the 'PROFILE' word was part of the query or not..."
+
+        if has_profile; then
+            continue
+        fi
+
         echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
         $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
 
