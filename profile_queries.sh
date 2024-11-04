@@ -290,8 +290,8 @@ if [ ${#TXN_IDS[@]} -gt 0 ]; then
         
         echo "Checking whether the 'PROFILE' word was part of the query or not..."
 
-        if has_profile; then
-            continue
+        if ! has_profile; then
+            exit 1
         fi
 
         echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
