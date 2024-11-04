@@ -179,7 +179,7 @@ has_profile() {
     OUTPUT=$($VSQL_ADMIN_COMMAND -Atc "SELECT request FROM query_requests WHERE transaction_id=$TXN_ID AND statement_id=$STMT_ID AND request ILIKE 'PROFILE%';")
 
     # Check if the output contains more than just the header and row count
-    if echo "$OUTPUT" | grep -qE '^[[:space:]]*PROFILE'; then
+    if echo "$OUTPUT" | grep -qEi '^[[:space:]]*PROFILE'; then
         echo "The query contains the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID':"
     else
         echo "ERROR: The query does not contain the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID'"
