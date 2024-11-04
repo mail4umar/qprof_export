@@ -31,24 +31,32 @@ set -euo pipefail
 
 usage() {
     echo "\
-$0 accepts inputs as follow:
+$0 accepts inputs as follows:
 
 Usage: $0
 
     Options:
-    -j, --job_file          [Required] eg. foo.txt
-    -s, --target_schema     [Optional] eg. test_01 (The schema name should be unused)
-    -t, --transactions      [Optional] txn_id,stmt_id (Profile an existing transaction)
+    -j, --job_file          [Required] e.g., foo.txt
+    -s, --target_schema     [Optional] e.g., test_01 (The schema name should be unused)
+    -t, --transactions      [Optional] (txn_id,stmt_id) or ((txn_id1,stmt_id1),(txn_id2,stmt_id2),...) 
+                             Profile one or multiple transactions and statements using tuples
 
     Help:
     -h, --help              [Help] Show this help info
 
-For example:
+For example, with a single tuple:
     $0 \
 -j foo.txt \
 -s test_01 \
--t 12345,67890"
+-t \"(411323123131,1)\"
+
+For example, with multiple tuples:
+    $0 \
+-j foo.txt \
+-s test_01 \
+-t \"((45035996273713358,1),(45035996273712247,1))\""
 }
+
 # end of function usage()
 
 # List of parameter flags
