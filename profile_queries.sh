@@ -36,9 +36,9 @@ $0 accepts inputs as follows:
 Usage: $0
 
     Options:
-    -j, --job_file          [Required] e.g., foo.txt
+    -j, --job_file          [Required if --transactions is not provided] e.g., foo.txt
     -s, --target_schema     [Optional] e.g., test_01 (The schema name should be unused)
-    -t, --transactions      [Optional] (txn_id,stmt_id) or ((txn_id1,stmt_id1),(txn_id2,stmt_id2),...) 
+    -t, --transactions      [Required if --job_file is not provided] (txn_id,stmt_id) or ((txn_id1,stmt_id1),(txn_id2,stmt_id2),...) 
                              Profile one or multiple transactions and statements using tuples
 
     Help:
@@ -176,13 +176,14 @@ generate_random_schema() {
 # Function to check whether the query has the word 'PROFILE' in it
 has_profile() {
     # Execute the query and capture the output
-    OUTPUT=$(vsql -c "SELECT request FROM query_requests WHERE transaction_id=$TXN_ID AND statement_id=$STMT_ID AND request ILIKE 'PROFILE%';")
+    OUTPUT=$($VSQL_ADMIN_COMMAND -Atc "SELECT request FROM query_requests WHERE transaction_id=$TXN_ID AND statement_id=$STMT_ID AND request ILIKE 'PROFILE%';")
 
     # Check if the output contains more than just the header and row count
     if echo "$OUTPUT" | grep -qE '^[[:space:]]*PROFILE'; then
         echo "The query contains the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID':"
     else
         echo "ERROR: The query does not contain the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID'"
+        echo "All the queries should contain the word 'PROFILE' in it."
         exit 1
     fi
 }
