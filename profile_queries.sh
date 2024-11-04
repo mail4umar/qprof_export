@@ -290,9 +290,7 @@ if [ ${#TXN_IDS[@]} -gt 0 ]; then
         
         echo "Checking whether the 'PROFILE' word was part of the query or not..."
 
-        if ! has_profile; then
-            exit 1
-        fi
+        has_profile
 
         echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
         $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
