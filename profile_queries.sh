@@ -89,19 +89,26 @@ TXN_IDS=()
 STMT_IDS=()
 
 if [ -n "$transactions" ]; then
-    # Split the input into pairs by semicolons
-    IFS=';' read -ra PAIRS <<< "$transactions"
-    for pair in "${PAIRS[@]}"; do
-        IFS=',' read -r txn_id stmt_id <<< "$pair"
+    # Remove surrounding parentheses and split the input into pairs
+    transactions="${transactions//\"/}"
+    transactions="${transactions//[\(\)]/}"
+    
+    # Split the input by comma, expecting txn_id,stmt_id pairs
+    IFS=',' read -ra PAIRS <<< "$transactions"
+    
+    # Process pairs in sets of two
+    for (( i=0; i<${#PAIRS[@]}; i+=2 )); do
+        TXN_ID="${PAIRS[i]}"
+        STMT_ID="${PAIRS[i+1]}"
         
         # Validate each pair
-        if [ -z "$txn_id" ] || [ -z "$stmt_id" ]; then
+        if [ -z "$TXN_ID" ] || [ -z "$STMT_ID" ]; then
             echo "ERROR: Each pair in --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
             exit 1
         fi
-        
-        TXN_IDS+=("$txn_id")
-        STMT_IDS+=("$stmt_id")
+
+        TXN_IDS+=("$TXN_ID")
+        STMT_IDS+=("$STMT_ID")
     done
 else
     JOB_FILE="$job_file"
