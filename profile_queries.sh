@@ -31,60 +31,106 @@ set -euo pipefail
 
 usage() {
     echo "\
-$0 accepts inputs as follow:
+$0 accepts inputs as follows:
 
 Usage: $0
 
     Options:
-    -j, --job_file          [Required] eg. foo.txt
-    -s, --target_schema     [Optional] eg. test_01 (The schema name should be unused)
+    -j, --job_file          [Required if --transactions is not provided] e.g., foo.txt
+    -s, --target_schema     [Optional] e.g., test_01 (The schema name should be unused)
+    -t, --transactions      [Required if --job_file is not provided] (txn_id,stmt_id) or ((txn_id1,stmt_id1),(txn_id2,stmt_id2),...) 
+                             Profile one or multiple transactions and statements using tuples
 
     Help:
     -h, --help              [Help] Show this help info
 
-For example:
+For example, with a single tuple:
     $0 \
 -j foo.txt \
--s test_01"
+-s test_01 \
+-t \"(411323123131,1)\"
+
+For example, with multiple tuples:
+    $0 \
+-j foo.txt \
+-s test_01 \
+-t \"((45035996273713358,1),(45035996273712247,1))\""
 }
+
 # end of function usage()
 
 # List of parameter flags
-TEMP=$(getopt -o j:s:h --long job_file:,target_schema:,help -n 'ERROR: $0' -- "$@")
+TEMP=$(getopt -o j:s:t:h --long job_file:,target_schema:,transactions:,help -n 'ERROR: $0' -- "$@")
 
-if [ $? != 0 ] ; then usage ; exit ; fi
+if [ $? != 0 ]; then usage; exit; fi
 eval set -- "$TEMP"
 
 # Bind each parameter NAME
 job_file=""
 target_schema=""
+transactions=""
 
-while true ; do
-    # Matching parameter FLAGS to parameter NAMES
+while true; do
     case "$1" in
         -j|--job_file)         job_file=$2; shift 2;;
         -s|--target_schema)    target_schema=$2; shift 2;;
+        -t|--transactions)     transactions=$2; shift 2;;
         -h|--help)             usage; exit 0;;
         --)                    shift; break;;
         *)                     break;;
     esac
 done
 
-# Check for any MISSING required parameters
-if [ "x${job_file}" = "x" ]; then usage; echo "ERROR: --job_file option must be provided."; exit 1; fi
-
-# End of options
-
-JOB_FILE="$job_file"
-TARGET_SCHEMA="${target_schema:-}"
-
-SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
-SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
-
-if [ ! -e "$JOB_FILE" ]; then
-    echo "Configuration file $JOB_FILE does not exist"
+# Enforce either job_file or transactions, but not both
+if [ -z "$job_file" ] && [ -z "$transactions" ]; then
+    usage
+    echo "ERROR: Either --job_file or --transactions must be provided."
+    exit 1
+elif [ -n "$job_file" ] && [ -n "$transactions" ]; then
+    usage
+    echo "ERROR: Provide either --job_file or --transactions, but not both."
     exit 1
 fi
+
+# Extract txn_id and stmt_id from transactions input
+TXN_IDS=()
+STMT_IDS=()
+
+if [ -n "$transactions" ]; then
+    # Remove surrounding parentheses and split the input into pairs
+    transactions="${transactions//\"/}"
+    transactions="${transactions//[\(\)]/}"
+    
+    # Split the input by comma, expecting txn_id,stmt_id pairs
+    IFS=',' read -ra PAIRS <<< "$transactions"
+    
+    # Process pairs in sets of two
+    for (( i=0; i<${#PAIRS[@]}; i+=2 )); do
+        TXN_ID="${PAIRS[i]}"
+        STMT_ID="${PAIRS[i+1]}"
+        
+        # Validate each pair
+        if [ -z "$TXN_ID" ] || [ -z "$STMT_ID" ]; then
+            echo "ERROR: Each pair in --transactions option must provide both txn_id and stmt_id in the format txn_id,stmt_id."
+            exit 1
+        fi
+
+        TXN_IDS+=("$TXN_ID")
+        STMT_IDS+=("$STMT_ID")
+    done
+else
+    JOB_FILE="$job_file"
+    if [ ! -e "$JOB_FILE" ]; then
+        echo "Configuration file $JOB_FILE does not exist"
+        exit 1
+    fi
+fi
+
+
+TARGET_SCHEMA="${target_schema:-}"
+SCRIPT_DIRNAME=$(dirname $BASH_SOURCE[0])
+SCRIPT_PATH=$(readlink -f $SCRIPT_DIRNAME)
+# End of options
 
 SQL_DIR="${SCRIPT_PATH}/sql"
 
@@ -125,6 +171,21 @@ generate_random_schema() {
             return
         fi
     done
+}
+
+# Function to check whether the query has the word 'PROFILE' in it
+has_profile() {
+    # Execute the query and capture the output
+    OUTPUT=$($VSQL_ADMIN_COMMAND -Atc "SELECT request FROM query_requests WHERE transaction_id=$TXN_ID AND statement_id=$STMT_ID AND request ILIKE 'PROFILE%';")
+
+    # Check if the output contains more than just the header and row count
+    if echo "$OUTPUT" | grep -qEi '^[[:space:]]*PROFILE'; then
+        echo "The query contains the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID':"
+    else
+        echo "ERROR: The query does not contain the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID'"
+        echo "All the queries should contain the word 'PROFILE' in it."
+        exit 1
+    fi
 }
 
 # Check and handle target schema
@@ -222,96 +283,123 @@ $VSQL_ADMIN_COMMAND -a -c "create table if not exists $TARGET_SCHEMA.collection_
 
 PROF_COUNT=0
 LINE_COUNT=0
+# Use provided txn_id and stmt_id if available, otherwise execute the profiling as usual
+if [ ${#TXN_IDS[@]} -gt 0 ]; then
+    for (( i=0; i<${#TXN_IDS[@]}; i++ )); do
+        TXN_ID="${TXN_IDS[i]}"
+        STMT_ID="${STMT_IDS[i]}"
+        
+        echo "Checking whether the 'PROFILE' word was part of the query or not..."
 
-while read -r line;
-do
-    LINE_COUNT=$(($LINE_COUNT + 1))
-    if [[ $line == "#"* ]]; then
-        echo "Skipping comment on line num $LINE_COUNT, '$line'"
-        continue
-    fi
-    USER_LABEL=$(echo $line | cut -d '|' -f 1)
-    USER_COMMENT=$(echo $line | cut -d '|' -f 2)
-    QUERY_FILE=$(echo $line | cut -d '|' -f 3 | tr -d ' ')
+        has_profile
 
-    if [ -z "$USER_LABEL" ]; then
-        echo "Line $LINE_COUNT has empty user label: '$line'"
-        exit 1
-    fi
+        echo "Storing existing profiled query using transaction: TXN_ID=$TXN_ID, STMT_ID=$STMT_ID"
+        $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
 
-    if [ -z "$USER_COMMENT" ]; then
-        echo "Line $LINE_COUNT has empty user comment: '$line'"
-        exit 1
-    fi
-
-    if [ -z "$QUERY_FILE" ]; then
-        echo "Line $LINE_COUNT has empty user comment: '$line'"
-        exit 1
-    fi
-
-    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-    echo "Query: $USER_LABEL, '$USER_COMMENT', $QUERY_FILE"
-
-    QUERY_FILE_BASENAME=$(basename "$QUERY_FILE")
-
-    echo "Adding profile statement..."
-    SCRATCH_QUERY_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}
-
-    cp -v "${QUERY_FILE}" "${SCRATCH_QUERY_FILE}"
-
-    # The following sed command adds profiling ONCE
-    sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt])/{s#(^\(?WITH|^\(?SELECT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
-
-    # the follow sed command extends the hint to have a label
-    if grep -c '/[*][+]' ${SCRATCH_QUERY_FILE}; then
-	# Case - there is a hint in the query already
-	# INPUT: select /*+opt_dir('V2OptDisableJoinRanks=true')*/ ...
-	# OUTPUT: select /*+opt_dir('V2OptDisableJoinRanks=true'), label('CQCS')*/
-	# We must extend the query hint: distinct hints are not allowed
-	# It follows that there is exactly one hint the input query: otherwise, the
-	# query would be invalid
-	sed -i -r -e "s#/[*][+](.*)\)[*]/#/*+\1\), label('$USER_LABEL')*/#" ${SCRATCH_QUERY_FILE}
-    else
-	# Case - there is no hint in the query already
-	sed -i -r -e "0,/(^WITH|^SELECT)/{s#(^WITH|^SELECT)# \1 /*+label('$USER_LABEL')*/ #}" ${SCRATCH_QUERY_FILE}
-    fi
-
-    echo "Begin query execution"
-
-    PROFILE_NOTICE_FILE=$SCRATCH_DIR/${QUERY_FILE_BASENAME}.prof_msg
-    time $VSQL_USER_COMMAND -o /dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
-    echo "Query execution complete"
-    cat $PROFILE_NOTICE_FILE
-    QUERY_ID_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}.qid
-    grep '^HINT:' $PROFILE_NOTICE_FILE | sed 's#.*transaction_id=\([0-9]\+\) and statement_id=\([0-9]\+\).*#\1|\2#' > $QUERY_ID_FILE
-    combo_tid_sid=$(cat ${QUERY_ID_FILE})
-    TXN_ID=`echo $combo_tid_sid | cut -f1 -d '|'`
-    STMT_ID=`echo $combo_tid_sid | cut -f2 -d '|'`
-
-    echo "TXN: $TXN_ID"
-    echo "STMT: $STMT_ID"
-    if [ -z "$TXN_ID" ]; then
-	    echo "Error: TXN_ID was empty, combo_tid_sid was $combo_tid_sid"
-	    exit 1
-    fi
-    $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$USER_LABEL', '$USER_COMMENT', '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
-
-    for t in $SNAPSHOT_TABLES
-    do
-	echo "---------------------------------------------"
-	echo "Collecting from SNAPSHOT Source Table is $t"
-	echo "---------------------------------------------"
-	ORIGINAL_SCHEMA="${t%%.*}"
-	TABLE_NAME="${t##*.}"
-
-	time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
-
+        for t in $SNAPSHOT_TABLES; do
+            echo "---------------------------------------------"
+            echo "Collecting from SNAPSHOT Source Table is $t"
+            echo "---------------------------------------------"
+            ORIGINAL_SCHEMA="${t%%.*}"
+            TABLE_NAME="${t##*.}"
+            time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+        done
+        PROF_COUNT=$((PROF_COUNT + 1))
     done
+else
+    # Process profiling based on provided job file if no transaction details were given
+    echo "Processing new queries from job file..."
+        
+    while read -r line;
+    do
+        LINE_COUNT=$(($LINE_COUNT + 1))
+        if [[ $line == "#"* ]]; then
+            echo "Skipping comment on line num $LINE_COUNT, '$line'"
+            continue
+        fi
+        USER_LABEL=$(echo $line | cut -d '|' -f 1)
+        USER_COMMENT=$(echo $line | cut -d '|' -f 2)
+        QUERY_FILE=$(echo $line | cut -d '|' -f 3 | tr -d ' ')
 
-    PROF_COUNT=$((PROF_COUNT +1))
-    echo "Done with query $USER_LABEL count $PROF_COUNT"
+        if [ -z "$USER_LABEL" ]; then
+            echo "Line $LINE_COUNT has empty user label: '$line'"
+            exit 1
+        fi
 
-done < "$JOB_FILE"
+        if [ -z "$USER_COMMENT" ]; then
+            echo "Line $LINE_COUNT has empty user comment: '$line'"
+            exit 1
+        fi
+
+        if [ -z "$QUERY_FILE" ]; then
+            echo "Line $LINE_COUNT has empty user comment: '$line'"
+            exit 1
+        fi
+
+        echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+        echo "Query: $USER_LABEL, '$USER_COMMENT', $QUERY_FILE"
+
+        QUERY_FILE_BASENAME=$(basename "$QUERY_FILE")
+
+        echo "Adding profile statement..."
+        SCRATCH_QUERY_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}
+
+        cp -v "${QUERY_FILE}" "${SCRATCH_QUERY_FILE}"
+
+        # The following sed command adds profiling ONCE
+        sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt])/{s#(^\(?WITH|^\(?SELECT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
+
+        # the follow sed command extends the hint to have a label
+        if grep -c '/[*][+]' ${SCRATCH_QUERY_FILE}; then
+        # Case - there is a hint in the query already
+        # INPUT: select /*+opt_dir('V2OptDisableJoinRanks=true')*/ ...
+        # OUTPUT: select /*+opt_dir('V2OptDisableJoinRanks=true'), label('CQCS')*/
+        # We must extend the query hint: distinct hints are not allowed
+        # It follows that there is exactly one hint the input query: otherwise, the
+        # query would be invalid
+        sed -i -r -e "s#/[*][+](.*)\)[*]/#/*+\1\), label('$USER_LABEL')*/#" ${SCRATCH_QUERY_FILE}
+        else
+        # Case - there is no hint in the query already
+        sed -i -r -e "0,/(^WITH|^SELECT)/{s#(^WITH|^SELECT)# \1 /*+label('$USER_LABEL')*/ #}" ${SCRATCH_QUERY_FILE}
+        fi
+
+        echo "Begin query execution"
+
+        PROFILE_NOTICE_FILE=$SCRATCH_DIR/${QUERY_FILE_BASENAME}.prof_msg
+        time $VSQL_USER_COMMAND -o /dev/null -f ${SCRATCH_QUERY_FILE} 2>> $PROFILE_NOTICE_FILE
+        echo "Query execution complete"
+        cat $PROFILE_NOTICE_FILE
+        QUERY_ID_FILE=${SCRATCH_DIR}/${QUERY_FILE_BASENAME}.qid
+        grep '^HINT:' $PROFILE_NOTICE_FILE | sed 's#.*transaction_id=\([0-9]\+\) and statement_id=\([0-9]\+\).*#\1|\2#' > $QUERY_ID_FILE
+        combo_tid_sid=$(cat ${QUERY_ID_FILE})
+        TXN_ID=`echo $combo_tid_sid | cut -f1 -d '|'`
+        STMT_ID=`echo $combo_tid_sid | cut -f2 -d '|'`
+
+        echo "TXN: $TXN_ID"
+        echo "STMT: $STMT_ID"
+        if [ -z "$TXN_ID" ]; then
+            echo "Error: TXN_ID was empty, combo_tid_sid was $combo_tid_sid"
+            exit 1
+        fi
+        $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.collection_info values ($TXN_ID, $STMT_ID, '$USER_LABEL', '$USER_COMMENT', '$PROJECT_NAME', '$CUSTOMER_NAME'); commit;"
+
+        for t in $SNAPSHOT_TABLES
+        do
+        echo "---------------------------------------------"
+        echo "Collecting from SNAPSHOT Source Table is $t"
+        echo "---------------------------------------------"
+        ORIGINAL_SCHEMA="${t%%.*}"
+        TABLE_NAME="${t##*.}"
+
+        time $VSQL_ADMIN_COMMAND -a -c "insert into $TARGET_SCHEMA.$TABLE_NAME select *, $TXN_ID, $STMT_ID, '$USER_LABEL' from $ORIGINAL_SCHEMA.$TABLE_NAME ; commit;"
+
+        done
+
+        PROF_COUNT=$((PROF_COUNT +1))
+        echo "Done with query $USER_LABEL count $PROF_COUNT"
+
+    done < "$JOB_FILE"
+fi
 
 for t in $SOURCE_TABLES
 do

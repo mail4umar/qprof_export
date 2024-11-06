@@ -113,6 +113,7 @@ do
     
     # Append metadata to JSON file
     echo "\"{\\\"table_type_name\\\": \\\"$table\\\", \\\"table_type_value\\\": \\\"$table\\\", \\\"file_name\\\": \\\"$table.parquet\\\", \\\"exported_rows\\\": $rows}\"," >> $METADATA_FILE
+
 done
 
 for t in "${TARGET_SCHEMA}.export_events"
