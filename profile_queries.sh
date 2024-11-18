@@ -234,7 +234,7 @@ if [ -n "$transactions" ]; then
 
             # Compare the timestamps
             if [[ $query_min_time_epoch -lt $table_min_time_epoch ]]; then
-                echo "Retention issues. The table '$table' does not have old enough data to capture the query profile. Please re-profile your query."
+                echo "Retention issues. Table '$table' does not have old enough data to capture the query profile. Please re-profile your query and try again."
                 exit 1
             fi
         fi
