@@ -183,7 +183,7 @@ has_profile() {
         echo "The query contains the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID':"
     else
         echo "ERROR: The query does not contain the word 'PROFILE' for transaction ID '$TXN_ID' and statement ID '$STMT_ID'"
-        echo "All the queries should contain the word 'PROFILE' in it."
+        echo "All the queries should contain the word 'PROFILE' in them."
         exit 1
     fi
 }
