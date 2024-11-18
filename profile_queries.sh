@@ -220,7 +220,7 @@ if [ -n "$transactions" ]; then
 
         # Get the minimum timestamp from the current table
         table_min_time=$($VSQL_ADMIN_COMMAND -Atc "SELECT MIN($table_time) FROM $table;")
-        echo "The table '$table' has entries going far back as time $table_min_time"
+        echo "Table '$table' has entries going far back as time $table_min_time"
 
         # If the table_min_time is not empty and compare it to the query_min_time
         if [[ -n "$table_min_time" ]]; then
@@ -234,7 +234,7 @@ if [ -n "$transactions" ]; then
 
             # Compare the timestamps
             if [[ $query_min_time_epoch -lt $table_min_time_epoch ]]; then
-                echo "Retention issues. Table '$table' does not have old enough data to capture the query profile. Please re-profile your query and try again."
+                echo "Retention issues. Table '$table' does not have old enough data to capture the query profile. Please re-profile your query and then try exporting again."
                 exit 1
             fi
         fi
