@@ -197,9 +197,14 @@ if [ -n "$transactions" ]; then
         fi
         condition+="(transaction_id = ${TXN_IDS[i]} AND statement_id = ${STMT_IDS[i]})"
     done
+
     # Get the minimum start timestamp based on the condition
-    query_min_time=$($VSQL_ADMIN_COMMAND -Atc "SELECT MIN(start_timestamp) FROM query_requests WHERE $condition;")
-    echo "Query minimum start time: $query_min_time"
+    query_min_time="$($VSQL_ADMIN_COMMAND -Atc "SELECT MIN(start_timestamp) FROM query_requests WHERE $condition;")"
+    if [ "$i" -eq 0 ]; then
+        echo "Query minimum start time: $query_min_time"
+    else
+        echo "Minimum of all queries start time: $query_min_time"
+    fi
 
     # Define the important tables and their respective time columns
     declare -a important_table_list=(
@@ -214,33 +219,48 @@ if [ -n "$transactions" ]; then
         "v_internal.dc_plan_activities,start_time"
     )
 
+    # Array to keep track of tables with retention issues
+    retention_issues=()
+
     # Loop through each table and check their minimum time
     for table_data in "${important_table_list[@]}"; do
         IFS=',' read -r table table_time <<< "$table_data"
 
         # Get the minimum timestamp from the current table
-        table_min_time=$($VSQL_ADMIN_COMMAND -Atc "SELECT MIN($table_time) FROM $table;")
+        table_min_time="$($VSQL_ADMIN_COMMAND -Atc "SELECT MIN($table_time) FROM $table;")"
         echo "Table '$table' has entries going far back as time $table_min_time"
 
         # If the table_min_time is not empty and compare it to the query_min_time
         if [[ -n "$table_min_time" ]]; then
             # Format the datetime if it's a string
             if [[ $table_min_time == *+00 ]]; then
-                table_min_time=${table_min_time/+00/+0000}
+                table_min_time="${table_min_time/+00/+0000}"
             fi
             # Convert the timestamps to comparable formats
             table_min_time_epoch=$(date -d "$table_min_time" +"%s")
             query_min_time_epoch=$(date -d "$query_min_time" +"%s")
 
             # Compare the timestamps
-            if [[ $query_min_time_epoch -lt $table_min_time_epoch ]]; then
-                echo "Retention issues. Table '$table' does not have old enough data to capture the query profile. Please re-profile your query and then try exporting again."
-                exit 1
+            if [[ "$query_min_time_epoch" -lt "$table_min_time_epoch" ]]; then
+                echo "Retention issue detected for table '$table'."
+                retention_issues+=("$table")
             fi
         fi
     done
-    echo "All tables have sufficient retention data."
+
+    # Check if there were any retention issues
+    if [ ${#retention_issues[@]} -gt 0 ]; then
+        echo "Retention issues found in the following tables:"
+        for table in "${retention_issues[@]}"; do
+            echo " - $table"
+        done
+        echo "Retention issues exist. Please re-profile your query or extend the data retention time for the affected tables."
+        exit 1
+    else
+        echo "All tables have sufficient retention data."
+    fi
 fi
+
 
 # Check and handle target schema
 if [ -z "$TARGET_SCHEMA" ]; then
