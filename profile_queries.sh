@@ -421,7 +421,7 @@ else
         cp -v "${QUERY_FILE}" "${SCRATCH_QUERY_FILE}"
 
         # The following sed command adds profiling ONCE
-        sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt])/{s#(^\(?WITH|^\(?SELECT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
+        sed -i -r -e "0,/(^\(?[Ww][Ii][Tt][Hh]|^\(?[Ss][Ee][Ll][Ee][Cc][Tt]^\(?[Ii][Nn][Ss][Ee][Rr][Tt])/{s#(^\(?WITH|^\(?SELECT|^\(?INSERT)#PROFILE \1 #i}" ${SCRATCH_QUERY_FILE}
 
         # the follow sed command extends the hint to have a label
         if grep -c '/[*][+]' ${SCRATCH_QUERY_FILE}; then
